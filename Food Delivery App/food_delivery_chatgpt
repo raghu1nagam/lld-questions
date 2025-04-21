@@ -1,0 +1,337 @@
+// Full implementation for the food delivery system in one file
+
+package com.fooddelivery;
+
+import java.util.*;
+
+// ENUMS
+enum UserType { NORMAL, PRIME; }
+enum PaymentType { UPI, CARD, CASH_ON_DELIVERY; }
+enum OrderStatus { PLACED, ACCEPTED, PICKED_UP, DELIVERED; } // Enum for order status
+
+// MODELS
+abstract class User {
+    private static int idCounter = 1;
+    protected final String id;
+    protected final String name;
+    protected final UserType type;
+
+    public User(String name, UserType type) {
+        this.id = "U" + (idCounter++);
+        this.name = name;
+        this.type = type;
+    }
+    public String getId() { return id; }
+    public String getName() { return name; }
+    public UserType getType() { return type; }
+}
+
+class NormalUser extends User {
+    public NormalUser(String name) { super(name, UserType.NORMAL); }
+    public void register() {
+        System.out.println("Registering NormalUser: " + name);
+    }
+}
+
+class PrimeUser extends User {
+    public PrimeUser(String name) { super(name, UserType.PRIME); }
+    public void register() {
+        System.out.println("Registering PrimeUser: " + name);
+    }
+}
+
+class MenuItem {
+    private final String name;
+    private final double price;
+
+    public MenuItem(String name, double price) {
+        this.name = name;
+        this.price = price;
+    }
+    public String getName() { return name; }
+    public double getPrice() { return price; }
+
+    @Override
+    public String toString() {
+        return name + " - ₹" + price;
+    }
+}
+
+class Restaurant {
+    private static int idCounter = 1;
+    private final String id;
+    private final String name;
+    private final List<MenuItem> menu = new ArrayList<>();
+
+    public Restaurant(String name) {
+        this.id = "R" + (idCounter++);
+        this.name = name;
+    }
+    public String getId() { return id; }
+    public String getName() { return name; }
+    public List<MenuItem> getMenu() { return menu; }
+}
+
+class DeliveryPartner {
+    private static int idCounter = 1;
+    private final String id;
+    private final String name;
+
+    public DeliveryPartner(String name) {
+        this.id = "D" + (idCounter++);
+        this.name = name;
+    }
+    public String getId() { return id; }
+    public String getName() { return name; }
+}
+
+class Order {
+    private static int idCounter = 1;
+    private final String id;
+    private final User user;
+    private final Restaurant restaurant;
+    private final MenuItem item;
+    private OrderStatus status;
+    private DeliveryPartner deliveryPartner;
+
+    public Order(User user, Restaurant restaurant, MenuItem item) {
+        this.id = "O" + (idCounter++);
+        this.user = user;
+        this.restaurant = restaurant;
+        this.item = item;
+        this.status = OrderStatus.PLACED;
+    }
+    public String getId() { return id; }
+    public User getUser() { return user; }
+    public Restaurant getRestaurant() { return restaurant; }
+    public MenuItem getItem() { return item; }
+    public OrderStatus getStatus() { return status; }
+    public void setStatus(OrderStatus status) { this.status = status; }
+    public void setDeliveryPartner(DeliveryPartner dp) { this.deliveryPartner = dp; }
+    public DeliveryPartner getDeliveryPartner() { return deliveryPartner; }
+}
+
+// FACTORY
+class UserFactory {
+    public static User createUser(String name, UserType type) {
+        return switch (type) {
+            case NORMAL -> new NormalUser(name);
+            case PRIME -> new PrimeUser(name);
+        };
+    }
+}
+
+class PaymentFactory {
+    public static PaymentStrategy getPaymentStrategy(PaymentType type) {
+        return switch (type) {
+            case UPI -> new UpiPayment();
+            case CARD -> new CardPayment();
+            case CASH_ON_DELIVERY -> new CashOnDelivery();
+        };
+    }
+}
+
+// SERVICE CLASSES
+// NotificationService is the base class using the Strategy Design Pattern.
+// Strategy Pattern Benefit: We can plug in different notification strategies at runtime without modifying this class.
+class NotificationService {
+    private final NotificationStrategy strategy;
+    public NotificationService(NotificationStrategy strategy) { this.strategy = strategy; }
+    public void sendNotification(String message, Object target) {
+        strategy.sendNotification(message, target);
+    }
+}
+
+class UserService {
+    private final Map<String, User> users = new HashMap<>();
+    private final NotificationService notifier;
+
+    public UserService(NotificationService notifier) { this.notifier = notifier; }
+
+    public User onboardUser(String name, UserType type) {
+        User user = UserFactory.createUser(name, type);
+        users.put(user.getId(), user);
+        if (user instanceof NormalUser nu) nu.register();
+        else if (user instanceof PrimeUser pu) pu.register();
+        System.out.println("User onboarded: " + user.getName() + " (" + user.getType() + ")");
+        notifier.sendNotification("Welcome to Foodie!", user);
+        return user;
+    }
+}
+
+class RestaurantService {
+    private final Map<String, Restaurant> restaurants = new HashMap<>();
+    private final NotificationService notifier;
+
+    public RestaurantService(NotificationService notifier) { this.notifier = notifier; }
+
+    public Restaurant onboardRestaurant(String name) {
+        Restaurant restaurant = new Restaurant(name);
+        restaurants.put(restaurant.getId(), restaurant);
+        notifier.sendNotification("Welcome restaurant: " + restaurant.getName(), restaurant);
+        return restaurant;
+    }
+
+    public void addMenuItem(String restaurantId, String itemName, double price) {
+        restaurants.get(restaurantId).getMenu().add(new MenuItem(itemName, price));
+    }
+
+    public List<MenuItem> browseMenu(String restaurantId) {
+        return restaurants.get(restaurantId).getMenu();
+    }
+}
+
+class DeliveryPartnerService {
+    private final List<DeliveryPartner> partners = new ArrayList<>();
+    private final NotificationService notifier;
+
+    public DeliveryPartnerService(NotificationService notifier) { this.notifier = notifier; }
+
+    public DeliveryPartner onboardPartner(String name) {
+        DeliveryPartner dp = new DeliveryPartner(name);
+        partners.add(dp);
+        notifier.sendNotification("Delivery partner onboarded: " + dp.getName(), dp);
+        return dp;
+    }
+
+    public DeliveryPartner assignPartner() {
+        return partners.isEmpty() ? null : partners.get(0);
+    }
+}
+
+class OrderService {
+    private final List<Order> orders = new ArrayList<>();
+    private final DeliveryPartnerService deliveryService;
+    private final NotificationService userNotifier;
+    private final NotificationService restaurantNotifier;
+    private final NotificationService deliveryNotifier;
+
+    public OrderService(DeliveryPartnerService deliveryService,
+                        NotificationService userNotifier,
+                        NotificationService restaurantNotifier,
+                        NotificationService deliveryNotifier) {
+        this.deliveryService = deliveryService;
+        this.userNotifier = userNotifier;
+        this.restaurantNotifier = restaurantNotifier;
+        this.deliveryNotifier = deliveryNotifier;
+    }
+
+    public Order placeOrder(User user, Restaurant restaurant, MenuItem item, PaymentStrategy payment) {
+        Order order = new Order(user, restaurant, item);
+        orders.add(order);
+        userNotifier.sendNotification("Order placed for: " + item.getName(), user);
+        restaurantNotifier.sendNotification("New order received for: " + item.getName(), restaurant);
+        payment.pay(item.getPrice());
+        return order;
+    }
+
+    public void acceptOrder(Order order) {
+        order.setStatus(OrderStatus.ACCEPTED);
+        restaurantNotifier.sendNotification("Order accepted.", order.getRestaurant());
+        DeliveryPartner dp = deliveryService.assignPartner();
+        if (dp != null) {
+            order.setDeliveryPartner(dp);
+            deliveryNotifier.sendNotification("New order assigned.", dp);
+        }
+    }
+
+    public void updateStatus(Order order, OrderStatus status) {
+        order.setStatus(status);
+        deliveryNotifier.sendNotification("Order is now: " + status, order.getDeliveryPartner());
+        userNotifier.sendNotification("Order status: " + status, order.getUser());
+    }
+}
+
+// NOTIFICATION STRATEGIES IMPLEMENTING STRATEGY PATTERN
+interface NotificationStrategy {
+    void sendNotification(String message, Object target);
+}
+
+class UserNotificationStrategy implements NotificationStrategy {
+    public void sendNotification(String message, Object target) {
+        if (target instanceof User user) {
+            System.out.println("[Notification to User: " + user.getName() + "]: " + message);
+        } else {
+            System.out.println("[UserNotificationStrategy] Invalid target type: " + target.getClass());
+        }
+    }
+}
+
+class RestaurantNotificationStrategy implements NotificationStrategy {
+    public void sendNotification(String message, Object target) {
+        if (target instanceof Restaurant restaurant) {
+            System.out.println("[Notification to Restaurant: " + restaurant.getName() + "]: " + message);
+        } else {
+            System.out.println("[RestaurantNotificationStrategy] Invalid target type: " + target.getClass());
+        }
+    }
+}
+
+class DeliveryPartnerNotificationStrategy implements NotificationStrategy {
+    public void sendNotification(String message, Object target) {
+        if (target instanceof DeliveryPartner dp) {
+            System.out.println("[Notification to DeliveryPartner: " + dp.getName() + "]: " + message);
+        } else {
+            System.out.println("[DeliveryPartnerNotificationStrategy] Invalid target type: " + target.getClass());
+        }
+    }
+}
+
+// PAYMENT STRATEGIES IMPLEMENTING STRATEGY PATTERN
+interface PaymentStrategy {
+    void pay(double amount);
+}
+
+class UpiPayment implements PaymentStrategy {
+    public void pay(double amount) {
+        System.out.println("Paid " + amount + " using UPI.");
+    }
+}
+
+class CardPayment implements PaymentStrategy {
+    public void pay(double amount) {
+        System.out.println("Paid " + amount + " using Card.");
+    }
+}
+
+class CashOnDelivery implements PaymentStrategy {
+    public void pay(double amount) {
+        System.out.println("Will pay " + amount + " on delivery.");
+    }
+}
+
+// MAIN METHOD
+public class Main {
+    public static void main(String[] args) {
+        NotificationService userNotifier = new NotificationService(new UserNotificationStrategy());
+        NotificationService restaurantNotifier = new NotificationService(new RestaurantNotificationStrategy());
+        NotificationService deliveryNotifier = new NotificationService(new DeliveryPartnerNotificationStrategy());
+
+        UserService userService = new UserService(userNotifier);
+        RestaurantService restaurantService = new RestaurantService(restaurantNotifier);
+        DeliveryPartnerService deliveryPartnerService = new DeliveryPartnerService(deliveryNotifier);
+        OrderService orderService = new OrderService(deliveryPartnerService, userNotifier, restaurantNotifier, deliveryNotifier);
+
+        User alice = userService.onboardUser("Alice", UserType.NORMAL);
+        User bob = userService.onboardUser("Bob", UserType.PRIME);
+
+        Restaurant dominoes = restaurantService.onboardRestaurant("Dominoes");
+        restaurantService.addMenuItem(dominoes.getId(), "Pizza", 250.0);
+        restaurantService.addMenuItem(dominoes.getId(), "Pasta", 200.0);
+
+        DeliveryPartner john = deliveryPartnerService.onboardPartner("John");
+        DeliveryPartner emma = deliveryPartnerService.onboardPartner("Emma");
+
+        System.out.println("Dominoes Menu: " + restaurantService.browseMenu(dominoes.getId()));
+
+        PaymentStrategy upiPayment = PaymentFactory.getPaymentStrategy(PaymentType.UPI);
+        Order order = orderService.placeOrder(alice, dominoes, dominoes.getMenu().get(0), upiPayment);
+
+        orderService.acceptOrder(order);
+        orderService.updateStatus(order, OrderStatus.PICKED_UP);
+        orderService.updateStatus(order, OrderStatus.DELIVERED);
+
+        PaymentStrategy card = PaymentFactory.getPaymentStrategy(PaymentType.CARD);
+        orderService.placeOrder(bob, dominoes, dominoes.getMenu().get(1), card);
+    }
+}
