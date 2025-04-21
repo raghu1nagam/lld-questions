@@ -1,0 +1,85 @@
+Here's a comprehensive summary of the food delivery system you've implemented in your Java code:
+
+---
+
+## ✅ **Overview**
+This system simulates a **Food Delivery Platform** where:
+- Users (Normal/Prime) can register, browse restaurants, place orders, and make payments.
+- Restaurants can onboard, add menu items, and receive orders.
+- Delivery partners can be onboarded and assigned to deliver orders.
+- Notifications are sent throughout the workflow using the **Strategy Design Pattern**.
+- Payments are handled via different payment methods using the **Strategy Design Pattern**.
+
+---
+
+## 🔧 **Design Patterns Used**
+
+### ✅ **Factory Pattern**
+- **Why?** To abstract the creation of `User` and `PaymentStrategy` objects based on input types.
+- **Used in:**
+  - `UserFactory` to create `NormalUser` or `PrimeUser`.
+  - `PaymentFactory` to return appropriate `PaymentStrategy` instance.
+
+### ✅ **Strategy Pattern**
+- **Why?** To allow dynamic selection of algorithms/behaviors for both **notifications** and **payment processing** without changing the clients.
+- **Used in:**
+  - `NotificationService` with strategies like `UserNotificationStrategy`, `RestaurantNotificationStrategy`, etc.
+  - `PaymentStrategy` interface with `UpiPayment`, `CardPayment`, `CashOnDelivery`.
+
+---
+
+## 📦 **Modules Overview**
+
+### 1. **Models**
+- `User`: Base class with `NormalUser` and `PrimeUser`.
+- `Restaurant`, `MenuItem`: For food providers and their offerings.
+- `DeliveryPartner`: Represents a person assigned to deliver.
+- `Order`: Represents a placed order and its lifecycle with `OrderStatus`.
+
+### 2. **Services**
+- `UserService`: Handles user onboarding and registration logic.
+- `RestaurantService`: Manages restaurant onboarding and menu.
+- `DeliveryPartnerService`: Registers and assigns delivery partners.
+- `OrderService`: Handles placing, accepting, assigning delivery, updating status, and payment.
+
+### 3. **Notifications**
+- `NotificationService`: Base class with injected `NotificationStrategy`.
+- Separate strategies for User, Restaurant, and DeliveryPartner — can easily extend for more.
+
+### 4. **Payments**
+- `PaymentStrategy`: Interface to support polymorphic payment execution.
+- Concrete implementations for UPI, Card, and COD.
+- `PaymentFactory`: Chooses strategy at runtime based on `PaymentType`.
+
+---
+
+## 🧾 **Enums**
+Used for cleaner, readable, and maintainable code:
+- `UserType` → NORMAL, PRIME
+- `PaymentType` → UPI, CARD, CASH_ON_DELIVERY
+- `OrderStatus` → PLACED, ACCEPTED, PICKED_UP, DELIVERED
+
+---
+
+## 🧠 **Advantages of This Design**
+- **Open/Closed Principle:** Easily add new strategies (e.g., notification, payment) without modifying existing logic.
+- **Single Responsibility:** Each service is responsible for its domain (user, restaurant, order).
+- **Extensibility:** Add more user types, notification channels (e.g., SMS, email), or delivery partner logic.
+- **Separation of Concerns:** Business logic is separate from data representation.
+
+---
+
+## ⚠️ **Possible Enhancements**
+- Add **availability logic** for delivery partners (currently always picks the first).
+- **Error handling** or validations (e.g., null checks on restaurant/menu).
+- **Decouple ID generation logic** from models for better control in real systems.
+- Implement **menu filtering** or **order history**.
+- Integrate **external payment gateway API simulation**.
+
+---
+
+Let me know if you want to:
+- Add real-time availability checking
+- Simulate external API integrations
+- Add logging instead of `System.out.println`
+- Or export this system to a microservice-style architecture in future steps!
